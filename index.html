@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Copy Code - Instant Code & Text Sharing</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- QRCode.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- Supabase JS Client SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://kxdszuwgkjpkcmjbytln.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_OMndSRUCeLaGN5gczsnBCg_ln4E3ue6';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  </script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              dark: '#0d1117',
+              card: '#161b22',
+              border: '#30363d',
+              accent: '#3fb950'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d1117;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #30363d;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #484f58;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.2s ease-out forwards;
+    }
+
+    /* Hide scrollbars for line number gutter */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+
+<body class="bg-[#0d1117] text-gray-200 min-h-full flex flex-col font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Navbar -->
+  <header class="border-b border-brand-border bg-brand-card/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16 gap-2">
+        <!-- Logo -->
+        <div class="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0" onclick="navigateToNew()">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-brand-500 to-emerald-700 flex items-center justify-center text-white shadow-lg shadow-brand-500/20">
+            <i class="fa-solid fa-code text-base sm:text-lg"></i>
+          </div>
+          <div>
+            <span class="text-base sm:text-xl font-bold tracking-tight text-white flex items-center gap-1 sm:gap-1.5">
+              Copy Code <span class="text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-accent border border-brand-500/20">PRO</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Navigation Action Buttons -->
+        <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <button onclick="navigateToNew()" class="px-2.5 sm:px-3.5 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-medium text-xs sm:text-sm transition-all flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span class="hidden xs:inline sm:inline">New Paste</span>
+            <span class="xs:hidden sm:hidden">New</span>
+          </button>
+          <button onclick="toggleHistoryDrawer()" class="px-2.5 sm:px-3.5 py-2 rounded-lg bg-[#21262d] hover:bg-[#30363d] text-gray-200 border border-brand-border font-medium text-xs sm:text-sm transition-all flex items-center gap-1.5">
+            <i class="fa-solid fa-clock-rotate-left text-xs text-gray-400"></i>
+            <span class="hidden sm:inline">My History</span>
+            <span id="history-count" class="bg-brand-border text-gray-300 text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-mono">0</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- VIEW 1: CREATE PASTE FORM -->
+    <div id="create-view" class="space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-brand-border">
+        <div>
+          <h1 class="text-2xl font-bold text-white tracking-tight">Create New Paste</h1>
+          <p class="text-sm text-gray-400 mt-1">Paste your code or text and instantly get a shareable short link.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        <!-- Main Editor Section (3 Cols) -->
+        <div class="lg:col-span-3 space-y-6">
+          <!-- Title Input -->
+          <div>
+            <label for="paste-title" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Paste Title</label>
+            <input type="text" id="paste-title" placeholder="(e.g. Code 7, Task 5 etc.)" 
+                   class="w-full bg-[#161b22] border border-brand-border rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors">
+          </div>
+          <!-- Code Textarea Container -->
+          <div class="relative">
+            <div class="flex items-center justify-between bg-[#161b22] border border-brand-border rounded-t-lg px-4 py-2 text-xs font-mono text-gray-400 border-b-0">
+              <span class="flex items-center gap-2"><i class="fa-solid fa-terminal text-brand-accent"></i> EDITOR</span>
+              
+              <!-- Stats Badge -->
+              <span id="editor-stats" class="text-[10px] text-gray-400 bg-[#0d1117] px-2.5 py-0.5 rounded-full border border-brand-border font-mono uppercase tracking-wider">Lines: 1 | Chars: 0</span>
+            </div>
+
+            <!-- Editor Wrapper with Line Numbers Gutter -->
+            <div class="flex bg-[#0d1117] border border-brand-border rounded-b-lg overflow-hidden">
+              <!-- Line Numbers Gutter -->
+              <div id="editor-line-numbers" class="select-none py-4 pl-3 pr-2 border-r border-brand-border text-gray-600 font-mono text-sm leading-relaxed text-right min-w-[2.75rem] bg-[#161b22]/30">1</div>
+              
+              <!-- Textarea Editor -->
+              <textarea id="paste-content" rows="11" 
+                        placeholder="// Type or paste your code here...&#10;function helloWorld() {&#10;  console.log('Hello, Copy Code!');&#10;}" 
+                        spellcheck="false"
+                        class="w-full bg-transparent p-4 font-mono text-sm text-gray-200 focus:outline-none transition-colors resize-y leading-relaxed border-none"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Meta Sidebar (1 Col) -->
+        <div class="lg:pt-[28px]">
+          <!-- Settings Box aligned top with Editor box height -->
+          <div class="space-y-5 bg-[#161b22] p-5 rounded-lg border border-brand-border h-fit">
+            <h3 class="text-sm font-semibold text-white uppercase tracking-wider pb-2 border-b border-brand-border flex items-center gap-2">
+              <i class="fa-solid fa-sliders text-brand-accent"></i> Settings
+            </h3>
+
+            <!-- Language Selector -->
+            <div>
+              <label for="paste-language" class="block text-xs font-medium text-gray-300 mb-1.5">File Format / Extension</label>
+              <select id="paste-language" class="w-full bg-[#0d1117] border border-brand-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+                <option value="plaintext">Plain Text (.txt)</option>
+                <option value="javascript">JavaScript (.js)</option>
+                <option value="python">Python (.py)</option>
+                <option value="html">HTML (.html)</option>
+                <option value="css">CSS (.css)</option>
+                <option value="typescript">TypeScript (.ts)</option>
+                <option value="cpp">C++ (.cpp)</option>
+                <option value="java">Java (.java)</option>
+                <option value="sql">SQL (.sql)</option>
+                <option value="json">JSON (.json)</option>
+                <option value="bash">Bash (.sh)</option>
+                <option value="markdown">Markdown (.md)</option>
+              </select>
+            </div>
+
+            <!-- Expiration Selector -->
+            <div>
+              <label for="paste-expiration" class="block text-xs font-medium text-gray-300 mb-1.5">Expiration</label>
+              <select id="paste-expiration" class="w-full bg-[#0d1117] border border-brand-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-500">
+                <option value="7h" selected>7 Hours (Default)</option>
+                <option value="10m">10 Minutes</option>
+                <option value="1h">1 Hour</option>
+                <option value="1d">1 Day</option>
+                <option value="1w">1 Week</option>
+                <option value="never">Never (Persistent)</option>
+              </select>
+            </div>
+
+            <!-- Optional Password -->
+            <div>
+              <label for="paste-password" class="block text-xs font-medium text-gray-300 mb-1.5">Password (Optional)</label>
+              <div class="relative">
+                <input type="password" id="paste-password" placeholder="Protection password" 
+                       class="w-full bg-[#0d1117] border border-brand-border rounded-lg pl-3 pr-8 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500">
+                <i class="fa-solid fa-lock text-xs text-gray-500 absolute right-3 top-3"></i>
+              </div>
+              <p class="text-[11px] text-gray-500 mt-1">Require a password to view this snippet.</p>
+            </div>
+
+            <!-- Primary Action Button placed at bottom of Settings box -->
+            <div class="pt-2">
+              <button onclick="createPaste()" class="w-full py-2.5 px-6 rounded-lg bg-gradient-to-r from-brand-600 to-emerald-600 hover:from-brand-500 hover:to-emerald-500 text-white font-semibold text-sm shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer h-[42px]">
+                <i class="fa-solid fa-link text-xs"></i>
+                <span>Create Share Link</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- VIEW 2: VIEW PASTE MODE -->
+    <div id="view-paste-container" class="hidden space-y-6">
+      
+      <!-- Password Prompt View -->
+      <div id="password-screen" class="hidden max-w-md mx-auto my-12 bg-[#161b22] border border-brand-border rounded-xl p-6 text-center space-y-4 shadow-xl">
+        <div class="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-xl">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <h2 class="text-xl font-bold text-white">Password Protected Paste</h2>
+        <p class="text-xs text-gray-400">This paste requires a password to view its contents.</p>
+        <div class="space-y-3">
+          <input type="password" id="unlock-password" placeholder="Enter paste password" 
+                 class="w-full bg-[#0d1117] border border-brand-border rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-brand-500">
+          <button onclick="unlockPaste()" class="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-medium text-sm transition-all cursor-pointer">
+            Unlock Paste
+          </button>
+        </div>
+      </div>
+
+      <!-- Actual Code Display Screen -->
+      <div id="paste-display-screen" class="space-y-4">
+        
+        <!-- Code View Header Bar -->
+        <div class="bg-[#161b22] border border-brand-border rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
+          <div class="space-y-1">
+            <div class="flex items-center gap-3 flex-wrap">
+              <h2 id="view-title" class="text-xl font-bold text-white">Untitled Paste</h2>
+              <span id="view-lang-badge" class="px-2.5 py-0.5 rounded-md bg-brand-500/10 text-brand-accent text-xs font-mono uppercase font-semibold border border-brand-500/20">JS</span>
+              <span id="view-expires-badge" class="px-2.5 py-0.5 rounded-md bg-gray-800 text-gray-400 text-xs font-mono">Expires: Never</span>
+            </div>
+            <div class="flex items-center gap-4 text-xs text-gray-400 font-mono pt-1">
+              <span><i class="fa-regular fa-calendar-alt text-gray-500"></i> <span id="view-date">Just now</span></span>
+              <span><i class="fa-solid fa-code-commit text-gray-500"></i> <span id="view-stats">0 lines | 0 chars</span></span>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="downloadCodeFile()" class="px-3.5 py-2 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-brand-border text-gray-200 text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-download"></i>
+              <span>Download</span>
+            </button>
+            <button id="raw-toggle-btn" onclick="toggleRawView()" class="px-3 py-2 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-brand-border text-gray-300 text-xs font-mono transition-all cursor-pointer">
+              Raw
+            </button>
+          </div>
+        </div>
+
+        <!-- Shareable URL Display Box -->
+        <div class="bg-[#161b22] border border-brand-border rounded-xl p-3.5 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-3 shadow-md">
+          <div class="flex items-center justify-between sm:justify-start gap-2 text-brand-accent text-xs font-semibold uppercase tracking-wider pl-1 shrink-0">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-share-nodes text-sm"></i>
+              <span>Share URL:</span>
+            </div>
+          </div>
+          <input type="text" id="view-url-input" readonly 
+                 class="w-full sm:flex-1 bg-[#0d1117] border border-brand-border rounded-lg px-3 py-2 text-xs font-mono text-gray-300 focus:outline-none select-all tracking-tight break-all sm:break-normal">
+          <button id="copy-url-box-btn" onclick="copyShareableLink()" class="w-full sm:w-auto px-3.5 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer">
+            <i class="fa-solid fa-link"></i>
+            <span>Copy Link</span>
+          </button>
+        </div>
+
+        <!-- QR Code Display Card -->
+        <div class="bg-[#161b22] border border-brand-border rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md">
+          <div class="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left w-full sm:w-auto">
+            <div id="qrcode-container" class="bg-white p-2 rounded-lg shadow border border-gray-200 flex items-center justify-center min-w-[128px] min-h-[128px]"></div>
+            <div class="space-y-1">
+              <h3 class="text-sm font-semibold text-white flex items-center justify-center sm:justify-start gap-2">
+                <i class="fa-solid fa-qrcode text-brand-accent"></i>
+                <span>QR Code Share Link</span>
+              </h3>
+              <p class="text-xs text-gray-400 max-w-xs mx-auto sm:mx-0">Scan this QR code with a mobile device to quickly view or copy this snippet.</p>
+            </div>
+          </div>
+          <button onclick="downloadQRCode()" class="w-full sm:w-auto px-3.5 py-2 rounded-lg bg-[#21262d] hover:bg-[#30363d] border border-brand-border text-gray-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer">
+            <i class="fa-solid fa-download"></i>
+            <span>Download QR</span>
+          </button>
+        </div>
+
+        <!-- Highlighted Code Box Container -->
+        <div class="relative bg-[#0d1117] border border-brand-border rounded-xl overflow-hidden shadow-2xl">
+          <!-- Plain Text View with Line Numbers -->
+          <div id="highlighted-wrapper" class="overflow-x-auto p-4 flex font-mono text-sm leading-relaxed text-gray-200">
+            <div id="line-numbers" class="select-none text-right pr-4 border-r border-brand-border text-gray-600 space-y-0.5 min-w-[2.5rem]"></div>
+            <pre id="code-viewer-block" class="pl-4 m-0 whitespace-pre font-mono text-gray-200 overflow-x-auto flex-1"></pre>
+          </div>
+
+          <!-- Raw View Area -->
+          <textarea id="raw-code-block" readonly class="hidden w-full h-[500px] p-4 bg-[#0d1117] text-gray-200 font-mono text-sm focus:outline-none resize-none"></textarea>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- HISTORY DRAWER (OFF-CANVAS) -->
+  <div id="history-drawer-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden opacity-0 transition-opacity duration-300" onclick="toggleHistoryDrawer()"></div>
+  <aside id="history-drawer" class="fixed right-0 top-0 h-full w-full max-w-md bg-[#161b22] border-l border-brand-border z-50 transform translate-x-full transition-transform duration-300 flex flex-col shadow-2xl">
+    <div class="p-5 border-b border-brand-border flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-clock-rotate-left text-brand-accent"></i>
+        <h3 class="font-bold text-white">Your Recent Pastes</h3>
+      </div>
+      <button onclick="toggleHistoryDrawer()" class="text-gray-400 hover:text-white p-1">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Search Input -->
+    <div class="p-4 border-b border-brand-border bg-[#0d1117]">
+      <div class="relative">
+        <input type="text" id="history-search" placeholder="Search saved pastes..." onkeyup="filterHistory()" 
+               class="w-full bg-[#161b22] border border-brand-border rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-brand-500">
+        <i class="fa-solid fa-magnifying-glass text-xs text-gray-500 absolute left-3 top-3"></i>
+      </div>
+    </div>
+
+    <!-- History List -->
+    <div id="history-list" class="flex-1 overflow-y-auto p-4 space-y-2">
+      <!-- Dynamic list items injected here -->
+    </div>
+
+    <div class="p-4 border-t border-brand-border text-center">
+      <button onclick="clearHistory()" class="text-xs text-red-400 hover:text-red-300 font-medium cursor-pointer">Clear History</button>
+    </div>
+  </aside>
+
+  <!-- Footer -->
+  <footer class="border-t border-brand-border py-6 text-center text-xs text-gray-500 bg-[#0d1117] mt-auto">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p>© 2026 Copy Code Application. Fast, lightweight code and text sharing. Made By Shahriar Leon.</p>
+      <div class="flex items-center gap-4 text-gray-400">
+        <span class="hover:text-white cursor-pointer" onclick="navigateToNew()">New Paste</span>
+        <span>•</span>
+        <span class="hover:text-white cursor-pointer" onclick="toggleHistoryDrawer()">History</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- App Script Logic -->
+  <script>
+    // Language Extensions mapping
+    const LANG_EXTENSIONS = {
+      javascript: 'js',
+      python: 'py',
+      html: 'html',
+      css: 'css',
+      typescript: 'ts',
+      cpp: 'cpp',
+      java: 'java',
+      sql: 'sql',
+      json: 'json',
+      bash: 'sh',
+      markdown: 'md',
+      plaintext: 'txt'
+    };
+
+    // State Variables
+    let currentPaste = null;
+    let isRawView = false;
+    let qrcodeInstance = null;
+
+    // --- INITIALIZATION ---
+    window.addEventListener('load', () => {
+      setupTextareaEvents();
+      handleRoute();
+      window.addEventListener('hashchange', handleRoute);
+      updateHistoryCount();
+    });
+
+    async function updateHistoryCount() {
+      const { count, error } = await supabase
+        .from('pastes')
+        .select('*', { count: 'exact', head: true });
+      
+      if (!error && count !== null) {
+        document.getElementById('history-count').innerText = count;
+      } else {
+        document.getElementById('history-count').innerText = '0';
+      }
+    }
+
+    // --- ROUTING ---
+    function handleRoute() {
+      const hash = window.location.hash;
+      if (hash.startsWith('#paste/')) {
+        const pasteId = hash.replace('#paste/', '');
+        showViewPaste(pasteId);
+      } else {
+        showCreateView();
+      }
+    }
+
+    function navigateToNew() {
+      window.location.hash = '';
+      showCreateView();
+    }
+
+    function showCreateView() {
+      document.getElementById('create-view').classList.remove('hidden');
+      document.getElementById('view-paste-container').classList.add('hidden');
+      document.getElementById('paste-content').focus();
+    }
+
+    // --- EDITOR & LINE NUMBERS GUTTER LOGIC ---
+    function setupTextareaEvents() {
+      const textarea = document.getElementById('paste-content');
+      const lineGutter = document.getElementById('editor-line-numbers');
+
+      function updateEditorStats() {
+        const val = textarea.value;
+        const linesCount = val ? val.split('\n').length : 1;
+        const charsCount = val.length;
+        document.getElementById('editor-stats').innerText = `Lines: ${linesCount} | Chars: ${charsCount}`;
+        
+        let linesHTML = '';
+        for (let i = 1; i <= linesCount; i++) {
+          linesHTML += `<div>${i}</div>`;
+        }
+        lineGutter.innerHTML = linesHTML;
+      }
+
+      textarea.addEventListener('input', updateEditorStats);
+      textarea.addEventListener('scroll', () => {
+        lineGutter.scrollTop = textarea.scrollTop;
+      });
+
+      textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+
+          textarea.value = textarea.value.substring(0, start) + "  " + textarea.value.substring(end);
+          textarea.selectionStart = textarea.selectionEnd = start + 2;
+          updateEditorStats();
+        }
+      });
+
+      updateEditorStats();
+    }
+
+    // Generate a short 6-character random ID
+    function generateId() {
+      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let result = '';
+      for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    // Helper to format short clean shareable URL
+    function getShareableUrl(id) {
+      const pasteId = id || (currentPaste ? currentPaste.id : '');
+      return `copycode.online/${pasteId}`;
+    }
+
+    // --- SUPABASE DATABASE OPERATIONS ---
+    async function createPaste() {
+      const content = document.getElementById('paste-content').value.trim();
+      if (!content) {
+        showToast('Please enter code before creating a paste!', 'error');
+        return;
+      }
+
+      const id = generateId();
+      const title = document.getElementById('paste-title').value.trim() || 'Untitled Paste';
+      const language = document.getElementById('paste-language').value;
+      const expiration = document.getElementById('paste-expiration').value;
+      const password = document.getElementById('paste-password').value.trim();
+
+      const { data, error } = await supabase
+        .from('pastes')
+        .insert([{
+          id,
+          title,
+          content,
+          language,
+          expiration,
+          password_protected: !!password,
+          password_hash: password ? password : null
+        }]);
+
+      if (error) {
+        showToast('Failed to save paste to database', 'error');
+        return;
+      }
+
+      // Reset form & update stats
+      document.getElementById('paste-content').value = '';
+      document.getElementById('paste-title').value = '';
+      document.getElementById('paste-password').value = '';
+      document.getElementById('paste-content').dispatchEvent(new Event('input'));
+
+      updateHistoryCount();
+      window.location.hash = `#paste/${id}`;
+      copyShareableLink();
+    }
+
+    async function showViewPaste(id) {
+      document.getElementById('create-view').classList.add('hidden');
+      document.getElementById('view-paste-container').classList.remove('hidden');
+
+      const { data: paste, error } = await supabase
+        .from('pastes')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error || !paste) {
+        showToast('Paste not found', 'error');
+        navigateToNew();
+        return;
+      }
+
+      currentPaste = paste;
+      isRawView = false;
+
+      if (paste.password_protected && paste.password_hash) {
+        document.getElementById('password-screen').classList.remove('hidden');
+        document.getElementById('paste-display-screen').classList.add('hidden');
+        document.getElementById('unlock-password').value = '';
+      } else {
+        renderPasteDisplay(paste);
+      }
+    }
+
+    function unlockPaste() {
+      const input = document.getElementById('unlock-password').value.trim();
+      if (input === currentPaste.password_hash) {
+        renderPasteDisplay(currentPaste);
+        showToast('Unlocked successfully');
+      } else {
+        showToast('Incorrect password!', 'error');
+      }
+    }
+
+    function renderPasteDisplay(paste) {
+      document.getElementById('password-screen').classList.add('hidden');
+      document.getElementById('paste-display-screen').classList.remove('hidden');
+
+      document.getElementById('view-title').innerText = paste.title;
+      document.getElementById('view-lang-badge').innerText = paste.language;
+      document.getElementById('view-expires-badge').innerText = `Expires: ${paste.expiration === '7h' ? '7 Hours' : paste.expiration}`;
+      
+      const dateStr = paste.created_at ? new Date(paste.created_at).toLocaleString() : 'Just now';
+      document.getElementById('view-date').innerText = dateStr;
+
+      const shareUrl = getShareableUrl(paste.id);
+      document.getElementById('view-url-input').value = shareUrl;
+
+      generateQRCode(shareUrl);
+
+      const linesArray = paste.content.split('\n');
+      const lines = linesArray.length;
+      const chars = paste.content.length;
+      document.getElementById('view-stats').innerText = `${lines} lines | ${chars} chars`;
+
+      const codeBlock = document.getElementById('code-viewer-block');
+      const lineNums = document.getElementById('line-numbers');
+      const rawBlock = document.getElementById('raw-code-block');
+
+      codeBlock.textContent = paste.content;
+      rawBlock.value = paste.content;
+
+      lineNums.innerHTML = linesArray.map((_, idx) => `<div>${idx + 1}</div>`).join('');
+
+      document.getElementById('highlighted-wrapper').classList.remove('hidden');
+      document.getElementById('raw-code-block').classList.add('hidden');
+      document.getElementById('raw-toggle-btn').classList.remove('bg-brand-600', 'text-white');
+    }
+
+    function toggleRawView() {
+      isRawView = !isRawView;
+      const highEl = document.getElementById('highlighted-wrapper');
+      const rawEl = document.getElementById('raw-code-block');
+      const btn = document.getElementById('raw-toggle-btn');
+
+      if (isRawView) {
+        highEl.classList.add('hidden');
+        rawEl.classList.remove('hidden');
+        btn.classList.add('bg-brand-600', 'text-white');
+      } else {
+        highEl.classList.remove('hidden');
+        rawEl.classList.add('hidden');
+        btn.classList.remove('bg-brand-600', 'text-white');
+      }
+    }
+
+    // --- QR CODE GENERATION & DOWNLOAD ---
+    function generateQRCode(url) {
+      const container = document.getElementById('qrcode-container');
+      container.innerHTML = '';
+      
+      try {
+        qrcodeInstance = new QRCode(container, {
+          text: url,
+          width: 128,
+          height: 128,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      } catch (err) {
+        console.error('QR Code generation error:', err);
+      }
+    }
+
+    function downloadQRCode() {
+      if (!currentPaste) return;
+      const container = document.getElementById('qrcode-container');
+      const img = container.querySelector('img');
+      const canvas = container.querySelector('canvas');
+
+      let dataUrl = '';
+      if (img && img.src) {
+        dataUrl = img.src;
+      } else if (canvas) {
+        dataUrl = canvas.toDataURL('image/png');
+      }
+
+      if (!dataUrl) {
+        showToast('Unable to download QR code image', 'error');
+        return;
+      }
+
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `qrcode_${currentPaste.id}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast('Downloading QR Code image!');
+    }
+
+    // --- ACTIONS: COPY & DOWNLOAD ---
+    function copyShareableLink() {
+      if (!currentPaste) return;
+      const url = getShareableUrl(currentPaste.id);
+      copyToClipboard(url, 'Share link copied to clipboard!');
+    }
+
+    function downloadCodeFile() {
+      if (!currentPaste) return;
+      const ext = LANG_EXTENSIONS[currentPaste.language] || 'txt';
+      const filename = `${currentPaste.title.toLowerCase().replace(/[^a-z0-9]/g, '_') || 'snippet'}.${ext}`;
+      
+      const blob = new Blob([currentPaste.content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast(`Downloading ${filename}`);
+    }
+
+    function copyToClipboard(text, successMsg) {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        if (successMsg) showToast(successMsg);
+      } catch (err) {
+        showToast('Failed to copy to clipboard', 'error');
+      }
+      document.body.removeChild(textArea);
+    }
+
+    // --- HISTORY DRAWER ---
+    async function toggleHistoryDrawer() {
+      const drawer = document.getElementById('history-drawer');
+      const overlay = document.getElementById('history-drawer-overlay');
+      const isHidden = drawer.classList.contains('translate-x-full');
+
+      if (isHidden) {
+        await renderHistoryList();
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+        drawer.classList.remove('translate-x-full');
+      } else {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('opacity-0');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+      }
+    }
+
+    async function renderHistoryList(filterQuery = '') {
+      const container = document.getElementById('history-list');
+      container.innerHTML = '<div class="text-center py-6 text-gray-500 text-xs">Loading history from database...</div>';
+
+      let query = supabase.from('pastes').select('*').order('created_at', { ascending: false });
+      
+      if (filterQuery) {
+        query = query.or(`title.ilike.%${filterQuery}%,language.ilike.%${filterQuery}%,content.ilike.%${filterQuery}%`);
+      }
+
+      const { data: items, error } = await query;
+
+      if (error || !items) {
+        container.innerHTML = `<div class="text-center py-8 text-red-400 text-xs">Failed to load history.</div>`;
+        return;
+      }
+
+      if (items.length === 0) {
+        container.innerHTML = `<div class="text-center py-8 text-gray-500 text-xs">No saved pastes found.</div>`;
+        return;
+      }
+
+      container.innerHTML = '';
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = "p-3 rounded-lg bg-[#0d1117] border border-brand-border hover:border-brand-500/50 transition-all flex items-center justify-between group cursor-pointer";
+        
+        const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString() : '';
+
+        div.innerHTML = `
+          <div class="flex-1 min-w-0 pr-3" onclick="loadHistoryItem('${item.id}')">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-sm text-gray-200 truncate group-hover:text-brand-accent transition-colors">${escapeHtml(item.title)}</span>
+              ${item.password_protected ? '<i class="fa-solid fa-lock text-[10px] text-amber-500"></i>' : ''}
+            </div>
+            <div class="flex items-center gap-2 text-[11px] text-gray-500 font-mono mt-1">
+              <span class="uppercase text-brand-accent/80">${item.language}</span>
+              <span>•</span>
+              <span>${dateStr}</span>
+            </div>
+          </div>
+          <button onclick="deleteHistoryItem(event, '${item.id}')" class="text-gray-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function filterHistory() {
+      const q = document.getElementById('history-search').value;
+      renderHistoryList(q);
+    }
+
+    function loadHistoryItem(id) {
+      toggleHistoryDrawer();
+      window.location.hash = `#paste/${id}`;
+    }
+
+    async function deleteHistoryItem(event, id) {
+      event.stopPropagation();
+      const { error } = await supabase.from('pastes').delete().eq('id', id);
+      
+      if (error) {
+        showToast('Failed to delete paste from database', 'error');
+        return;
+      }
+
+      renderHistoryList(document.getElementById('history-search').value);
+      updateHistoryCount();
+      showToast('Paste deleted from database');
+      
+      if (window.location.hash === `#paste/${id}`) {
+        navigateToNew();
+      }
+    }
+
+    async function clearHistory() {
+      const { error } = await supabase.from('pastes').delete().neq('id', ''); // Delete all rows
+      if (error) {
+        showToast('Failed to clear history', 'error');
+        return;
+      }
+      renderHistoryList();
+      updateHistoryCount();
+      showToast('All history cleared!');
+      navigateToNew();
+    }
+
+    // --- TOAST NOTIFICATIONS ---
+    function showToast(message, type = 'success', duration = 5000) {
+      const container = document.getElementById('toast-container');
+      container.innerHTML = '';
+
+      const toast = document.createElement('div');
+      const isError = type === 'error';
+      const bg = isError ? 'bg-red-950/90 border-red-700/50 text-red-200' : 'bg-brand-card/95 border-brand-accent/40 text-gray-200';
+      const icon = isError ? 'fa-circle-exclamation text-red-400' : 'fa-circle-check text-brand-accent';
+
+      toast.className = `px-4 py-3 rounded-lg border shadow-xl backdrop-blur text-xs font-medium flex items-center gap-2.5 transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${bg}`;
+      toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${escapeHtml(message)}</span>`;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
